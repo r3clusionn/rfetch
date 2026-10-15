@@ -12,6 +12,10 @@
  * pressure. fastfetch and free(1) use MemTotal - MemAvailable, which also
  * counts the kernel's watermark reserve as used.
  *
+ * Disk "used" on XFS leaves out the blocks the filesystem reserves in every
+ * allocation group for its own btrees, which statfs (df) counts as used; see
+ * xfs_reserved_blocks().
+ *
  * Usage: rfetch [-m] [-n]   -m: memory breakdown   -n: no logo
  */
 #define _GNU_SOURCE
@@ -683,12 +687,76 @@ static void f_memory(void)
 	}
 }
 
+/* XFS geometry (XFS_IOC_FSGEOMETRY, v5 layout; any user may ask). */
+struct xfs_geom {
+	uint32_t blocksize, rtextsize, agblocks, agcount, logblocks, sectsize, inodesize, imaxpct;
+	uint64_t datablocks, rtblocks, rtextents, logstart;
+	unsigned char uuid[16];
+	uint32_t sunit, swidth;
+	int32_t version;
+	uint32_t flags, logsectsize, rtsectsize, dirblocksize, logsunit, sick, checked, rgextents, rgcount;
+	uint64_t rtstart, rtreserved, reserved[14];
+};
+#define XFS_IOC_FSGEOMETRY _IOR('X', 126, struct xfs_geom)
+#define XFS_GEOM_V5SB (1u << 15)
+#define XFS_GEOM_FINOBT (1u << 17)
+#define XFS_GEOM_RMAPBT (1u << 19)
+#define XFS_GEOM_REFLINK (1u << 20)
+
+/* Blocks of a btree holding `recs` records at minimum fill (the kernel's xfs_btree_calc_size). */
+static uint64_t btree_blocks(uint64_t recs, unsigned leafmin, unsigned nodemin)
+{
+	uint64_t level = recs, blocks = 0;
+	for (int l = 0; level > 1; l++) {
+		unsigned m = l ? nodemin : leafmin;
+		level = (level + m - 1) / m;
+		blocks += level;
+	}
+	return blocks;
+}
+
+/* Blocks XFS holds back in every allocation group so its reverse-mapping, refcount
+ * and free-inode btrees can always grow (the kernel's per-AG reservations). statfs
+ * counts them as used; on a 937 GiB disk they are 18 GiB. Same formulas as
+ * xfs_rmapbt/refcountbt/finobt_calc_reserves; checked against GETFSMAP. */
+static uint64_t xfs_reserved_blocks(const char *path)
+{
+	int fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+	struct xfs_geom g;
+	memset(&g, 0, sizeof g);
+	int ok = fd >= 0 && !ioctl(fd, XFS_IOC_FSGEOMETRY, &g);
+	if (fd >= 0) close(fd);
+	if (!ok || !g.agcount || !g.agblocks || !g.blocksize || !g.inodesize) return 0;
+	unsigned room = g.blocksize - ((g.flags & XFS_GEOM_V5SB) ? 56 : 16); /* short btree block header */
+	unsigned rmap_leaf = room / 24 / 2, rmap_node = room / 44 / 2;   /* record; low+high key and pointer */
+	unsigned refc_leaf = room / 12 / 2, refc_node = room / 8 / 2;
+	unsigned ino_leaf = room / 16 / 2, ino_node = room / 8 / 2;
+	uint64_t inopblock = g.blocksize / g.inodesize, total = 0;
+	unsigned agbits = 0; /* AG number of the internal log: fsblock = agno << log2(agblocks rounded up) | agbno */
+	while ((1ull << agbits) < g.agblocks) agbits++;
+	for (uint32_t ag = 0; ag < g.agcount; ag++) {
+		uint64_t len = ag + 1 < g.agcount ? g.agblocks : g.datablocks - (uint64_t)(g.agcount - 1) * g.agblocks;
+		if (g.logstart && (g.logstart >> agbits) == ag && len > g.logblocks) len -= g.logblocks;
+		if (g.flags & XFS_GEOM_RMAPBT) {
+			uint64_t r = btree_blocks(len, rmap_leaf, rmap_node);
+			total += r > len / 100 ? r : len / 100;
+		}
+		if (g.flags & XFS_GEOM_REFLINK) total += btree_blocks(len, refc_leaf, refc_node);
+		if (g.flags & XFS_GEOM_FINOBT) total += btree_blocks(len * inopblock / 64, ino_leaf, ino_node);
+	}
+	return total;
+}
+
 static void f_disk(void)
 {
 	struct statvfs v;
 	struct statfs f;
 	if (statvfs("/", &v) || statfs("/", &f)) return;
 	double tot = (double)v.f_blocks * v.f_frsize, used = (double)(v.f_blocks - v.f_bfree) * v.f_frsize;
+	if ((unsigned long)f.f_type == 0x58465342) { /* XFS: leave out its metadata reservations */
+		double resv = (double)xfs_reserved_blocks("/") * v.f_frsize;
+		used = used > resv ? used - resv : 0;
+	}
 	static const struct { unsigned long m; const char *n; } fs[] = {
 		{ 0x58465342, "xfs" }, { 0xEF53, "ext4" }, { 0x9123683E, "btrfs" }, { 0xF2F52010, "f2fs" }, { 0x2FC12FC1, "zfs" },
 		{ 0xCA451A4E, "bcachefs" }, { 0x01021994, "tmpfs" }, { 0x794C7630, "overlay" }, { 0x6E736673, "nilfs2" } };
