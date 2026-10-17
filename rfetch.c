@@ -539,6 +539,28 @@ static void f_cpu(void)
 		snprintf(cores + n, sizeof cores - (size_t)n, ")");
 	} else
 		snprintf(cores, sizeof cores, "(%ld)", nc);
+#ifdef HAVE_CPUID
+	/* Fewer CPUs online than the chip has (nr_cpus=, maxcpus=, offlined): count the
+	 * hardware instead. AMD leaf 0x80000026 gives this CPU's core type and the size
+	 * of its core complex; with two core types, the rest of the chip is the other. */
+	unsigned ea, eb, ec, ed;
+	if (__get_cpuid_max(0x80000000, NULL) >= 0x80000026 && __get_cpuid(0x80000008, &ea, &eb, &ec, &ed) &&
+	    (long)(ec & 0xff) + 1 > nc) {
+		long total = (long)(ec & 0xff) + 1, cx = 0;
+		int hetero = 0, type = 0;
+		for (unsigned l = 0; l < 8; l++) {
+			__cpuid_count(0x80000026, l, ea, eb, ec, ed);
+			unsigned lt = (ec >> 8) & 0xff; /* 1 core, 2 complex, 3 die, 4 socket */
+			if (!lt) break;
+			if (l == 0) { hetero = ea >> 30 & 1; type = (int)(eb >> 28); }
+			if (lt == 2) cx = eb & 0xffff;
+		}
+		if (hetero && cx > 0 && cx < total) /* performance cores first */
+			snprintf(cores, sizeof cores, "(%ld+%ld)", type ? total - cx : cx, type ? cx : total - cx);
+		else
+			snprintf(cores, sizeof cores, "(%ld)", total);
+	}
+#endif
 	if (maxf > 0) field("CPU", "%s %s @ %.2f GHz", s, cores, maxf / 1e6);
 	else field("CPU", "%s %s", s, cores);
 }
