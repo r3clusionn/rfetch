@@ -851,26 +851,23 @@ static void f_locale(void)
 	if (l && *l) field("Locale", "%s", l);
 }
 
-/* Gentoo logo (same art as neofetch/fastfetch); \1 = magenta, \2 = white */
+/* cat logo; \1 = magenta, \2 = white */
 static const char *const logo[] = {
-	"\1         -/oyddmdhs+:.",
-	"\1     -o\2dNMMMMMMMMNNmhy+\1-`",
-	"\1   -y\2NMMMMMMMMMMMNNNmmdhy\1+-",
-	"\1 `o\2mMMMMMMMMMMMMNmdmmmmddhhy\1/`",
-	"\1 om\2MMMMMMMMMMMN\1hhyyyo\2hmdddhhhd\1o`",
-	"\1.y\2dMMMMMMMMMMd\1hs++so/s\2mdddhhhhdm\1+`",
-	"\1 oy\2hdmNMMMMMMMN\1dyooy\2dmddddhhhhyhN\1d.",
-	"\1  :o\2yhhdNNMMMMMMMNNNmmdddhhhhhyym\1Mh",
-	"\1    .:\2+sydNMMMMMNNNmmmdddhhhhhhmM\1my",
-	"\1       /m\2MMMMMMNNNmmmdddhhhhhmMNh\1s:",
-	"\1    `o\2NMMMMMMMNNNmmmddddhhdmMNhs\1+`",
-	"\1  `s\2NMMMMMMMMNNNmmmdddddmNMmhs\1/.",
-	"\1 /N\2MMMMMMMMNNNNmmmdddmNMNdso\1:`",
-	"\1+M\2MMMMMMNNNNNmmmmdmNMNdso\1/-",
-	"\1yM\2MNNNNNNNmmmmmNNMmhs+/\1-`",
-	"\1/h\2MMNNNNNNNNMNdhs++/\1-`",
-	"\1`/\2ohdmmddhys+++/:\1.`",
-	"\1  `-//////:--.",
+	"\2       _",
+	"\2       \\`*-.",
+	"\2        )  _`-.",
+	"\2       .  : `. .",
+	"\2       : _   '  \\",
+	"\2       ; *` _.   `*-._",
+	"\2       `-.-'          `-.",
+	"\2         ;       `       `.",
+	"\2         :.       .        \\",
+	"\2         . \\  .   :   .-'   .",
+	"\2         '  `+.;  ;  '      :",
+	"\2         :  '  |    ;       ;-.",
+	"\2         ; '   : :`-:     _.`* ;",
+	"\2      .*' /  .*' ; .*`- +'  `*'",
+	"\2      `*-*   `*-*  `*-*'",
 };
 
 int main(int argc, char **argv)
