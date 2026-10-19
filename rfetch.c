@@ -918,6 +918,7 @@ int main(int argc, char **argv)
 	f_battery();
 	f_plan();
 	f_locale();
+	int ntext = nlines;
 	if (color && nlines + 3 <= MAXLINES) {
 		nlines++; /* blank */
 		char *a = lines[nlines++], *b = lines[nlines++];
@@ -936,12 +937,14 @@ int main(int argc, char **argv)
 		for (const char *p = logo[r]; *p; p++) w += *p > 2;
 		if (w > logo_w) logo_w = w;
 	}
+	/* logo centred vertically beside the text lines (not the colour blocks) */
+	int top = ntext > nl ? (ntext - nl) / 2 : 0;
 	int rows = nl > nlines ? nl : nlines;
 	for (int r = 0; r < rows; r++) {
 		if (nl) {
-			int w = 0;
-			if (r < nl)
-				for (const char *p = logo[r]; *p; p++) {
+			int w = 0, lr = r - top, in = lr >= 0 && lr < nl;
+			if (in)
+				for (const char *p = logo[lr]; *p; p++) {
 					if (*p == 1 || *p == 2) {
 						if (color) emit(*p == 1 ? "\033[35m" : "\033[37m");
 					} else {
@@ -949,7 +952,7 @@ int main(int argc, char **argv)
 						w++;
 					}
 				}
-			if (color && r < nl) emit("\033[0m");
+			if (color && in) emit("\033[0m");
 			emit("%*s", logo_w - w + 3, "");
 		}
 		if (r < nlines) emit("%s", lines[r]);
