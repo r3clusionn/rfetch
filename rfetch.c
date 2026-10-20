@@ -453,12 +453,12 @@ static void f_display(void)
 			snprintf(key, sizeof key, name[0] ? "Display (%s)" : "Display", name);
 			if (fabs(hz - round(hz)) < 0.01) snprintf(hzs, sizeof hzs, "%.0f", hz);
 			else snprintf(hzs, sizeof hzs, "%.2f", hz);
-			int builtin = gc.connector_type == DRM_MODE_CONNECTOR_eDP || gc.connector_type == DRM_MODE_CONNECTOR_LVDS ||
-				      gc.connector_type == DRM_MODE_CONNECTOR_DSI;
+			/* no [Built-in]/[External] tag: it pushed the line past 80 columns, and the
+			 * panel name and size already tell the screens apart */
 			if (inch > 0)
-				field(key, "%ux%u @ %s Hz in %.0f\" [%s]", md->hdisplay, md->vdisplay, hzs, inch, builtin ? "Built-in" : "External");
+				field(key, "%ux%u @ %s Hz in %.0f\"", md->hdisplay, md->vdisplay, hzs, inch);
 			else
-				field(key, "%ux%u @ %s Hz [%s]", md->hdisplay, md->vdisplay, hzs, builtin ? "Built-in" : "External");
+				field(key, "%ux%u @ %s Hz", md->hdisplay, md->vdisplay, hzs);
 			shown++;
 		}
 		close(fd);
